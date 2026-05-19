@@ -26,7 +26,12 @@ connectDB();
    MIDDLEWARE
 ========================= */
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://ki-vix-management.netlify.app",
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
 
