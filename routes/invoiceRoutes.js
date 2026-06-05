@@ -121,6 +121,41 @@ router.delete("/:id", async (req, res) => {
 });
 
 /* =========================
+   CANCEL INVOICE
+========================= */
+
+router.put("/cancel/:id", async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: "Invoice not found",
+      });
+    }
+
+    if (invoice.status === "cancelled") {
+      return res.status(400).json({
+        message: "Invoice already cancelled",
+      });
+    }
+
+    invoice.status = "cancelled";
+
+    await invoice.save();
+
+    res.json({
+      message: "Invoice cancelled successfully",
+      invoice,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+});
+
+/* =========================
     UPDATE INVOICE
 ========================= */
 
