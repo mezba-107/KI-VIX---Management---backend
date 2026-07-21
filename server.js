@@ -14,6 +14,8 @@ const adminRoutes = require("./routes/adminRoutes");
 
 const stockRoutes = require("./routes/stockRoutes");
 
+const financeRoutes = require("./routes/financeRoutes");
+
 const app = express();
 
 /* =========================
@@ -44,6 +46,8 @@ app.use("/api/invoices", invoiceRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/stocks", stockRoutes);
+
+app.use("/api/finance", financeRoutes);
 
 /* =========================
    TEST ROUTE

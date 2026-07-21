@@ -37,8 +37,49 @@ const adminSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-  },
 
+    investment: {
+      type: Number,
+      default: 0,
+    },
+
+    expense: {
+      type: Number,
+      default: 0,
+    },
+
+    history: [
+      {
+        type: {
+          type: String,
+        },
+
+        amount: {
+          type: Number,
+        },
+
+        oldAmount: {
+          type: Number,
+          default: null,
+        },
+
+        newAmount: {
+          type: Number,
+          default: null,
+        },
+
+        addedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Admin",
+        },
+
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+  },
   {
     timestamps: true,
   },

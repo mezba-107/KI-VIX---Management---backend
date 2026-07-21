@@ -150,9 +150,22 @@ router.get("/profile", adminAuth, async (req, res) => {
   try {
     const admin = await Admin.findById(req.admin.id).select("-password");
 
+    let totalInvestment = 0;
+
+    admin.history.forEach((item) => {
+      if (item.type === "Deposit") {
+        totalInvestment += Number(item.amount || 0);
+      }
+    });
+
     res.json({
       success: true,
-      profile: admin,
+      profile: {
+        ...admin.toObject(),
+
+        totalInvestment, // মোট Deposit
+        currentBalance: admin.investment, // বর্তমান Balance
+      },
     });
   } catch (error) {
     console.log(error);
@@ -273,5 +286,35 @@ router.post(
     }
   },
 );
+
+/* =========================
+   GET ALL ADMINS FOR FINANCE
+========================= */
+
+router.get("/finance", adminAuth, async (req, res) => {
+  try {
+    const admins = await Admin.find({})
+      .select("name email image investment expense role history")
+      .sort({ createdAt: 1 });
+
+    const updatedAdmins = admins.map((admin) => ({
+      ...admin.toObject(),
+      balance: admin.investment || 0,
+    }));
+
+    res.json({
+      success: true,
+      admins: updatedAdmins,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+});
+console.log("Admin Routes Loaded");
 
 module.exports = router;
