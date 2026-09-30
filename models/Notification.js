@@ -31,6 +31,13 @@ const notificationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // যে যে Admin এই notification টা নিজের জন্য read করেছে (per-user read status)
+    readBy: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
+      default: [],
+    },
+
     targetRoles: {
       type: [String],
       default: ["Super Admin", "Admin", "Mod"],

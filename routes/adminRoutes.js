@@ -12,6 +12,9 @@ const {
   uploadProfile,
   changePassword,
   updateLastSeen,
+  requestPasswordReset,
+  approvePasswordReset,
+  rejectPasswordReset,
 } = require("../controllers/adminController");
 
 const storage = multer.memoryStorage();
@@ -19,6 +22,13 @@ const upload = multer({ storage });
 
 // LOGIN
 router.post("/login", login);
+
+// FORGOT PASSWORD — request a reset (public, not logged in yet)
+router.post("/forgot-password", requestPasswordReset);
+
+// Super Admin approves/rejects a pending reset request
+router.post("/approve-reset/:id", adminAuth, approvePasswordReset);
+router.post("/reject-reset/:id", adminAuth, rejectPasswordReset);
 
 // GET PROFILE
 router.get("/profile", adminAuth, getProfile);

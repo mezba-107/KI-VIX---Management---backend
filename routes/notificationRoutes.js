@@ -6,6 +6,7 @@ const {
   getNotifications,
   createNotification,
   deleteAllNotifications,
+  markNotificationRead,
 } = require("../controllers/notificationController");
 
 // getnotification
@@ -13,6 +14,9 @@ router.get("/", adminAuth, getNotifications);
 
 // creatnotification
 router.post("/", createNotification);
+
+// mark a single notification as read (per logged-in admin only)
+router.put("/:id/read", adminAuth, markNotificationRead);
 
 // delete notification by super Admin
 router.delete("/delete-all", adminAuth, deleteAllNotifications);

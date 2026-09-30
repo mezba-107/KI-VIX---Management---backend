@@ -1,6 +1,8 @@
 const jwt = require("jsonwebtoken");
 
 const Admin = require("../models/Admin");
+const PasswordResetRequest = require("../models/PasswordResetRequest");
+const Notification = require("../models/Notification");
 
 const multer = require("multer");
 
@@ -330,6 +332,275 @@ exports.updateLastSeen = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
+/* =========================
+   requestPasswordReset controller
+   (public — user isn't logged in, that's the whole point)
+========================= */
+
+exports.requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const admin = await Admin.findOne({ email });
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email",
+      });
+    }
+
+    const existingRequest = await PasswordResetRequest.findOne({
+      adminId: admin._id,
+      status: "pending",
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "A password reset request is already pending for this account",
+      });
+    }
+
+    const request = await PasswordResetRequest.create({
+      adminId: admin._id,
+      name: admin.name,
+      email: admin.email,
+      status: "pending",
+    });
+
+    await Notification.create({
+      category: "passwordreset",
+      requestId: request._id,
+      variant: "amber",
+      icon: "fa-key",
+      targetRoles: ["Super Admin"],
+      title: "Password Reset Request",
+      message: `${admin.name} requested a password reset`,
+
+      details: [
+        {
+          label: "Requester",
+          value: admin.name,
+        },
+        {
+          label: "Email",
+          value: admin.email,
+        },
+        {
+          label: "Role",
+          value: admin.role,
+        },
+        {
+          label: "Date",
+          value: new Date().toLocaleDateString(),
+        },
+      ],
+
+      actions: {
+        type: "approve-reject",
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Request submitted. A Super Admin will review it shortly.",
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
+/* =========================
+   approvePasswordReset controller
+========================= */
+
+exports.approvePasswordReset = async (req, res) => {
+  try {
+    const superAdmin = await Admin.findById(req.admin.id);
+
+    if (!superAdmin || superAdmin.role !== "Super Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access Denied",
+      });
+    }
+
+    const request = await PasswordResetRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Request Not Found",
+      });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Request already ${request.status}`,
+      });
+    }
+
+    const admin = await Admin.findById(request.adminId);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin Not Found",
+      });
+    }
+
+    // Same default-reset behaviour as the Super Admin's manual
+    // "Reset Password" action on the Admins & Mods page.
+    admin.password = "11111111";
+    await admin.save();
+
+    request.status = "approved";
+    await request.save();
+
+    // Delete old pending notification
+    await Notification.deleteMany({
+      category: "passwordreset",
+      requestId: request._id,
+    });
+
+    // Create approved notification — visible to everyone, so the
+    // requester sees confirmation once they're able to log back in.
+    await Notification.create({
+      category: "passwordreset",
+      requestId: request._id,
+      variant: "green",
+      icon: "fa-circle-check",
+      title: "Password Reset Approved",
+      message: `${request.name}'s password has been reset to the default password`,
+      details: [
+        {
+          label: "Name",
+          value: request.name,
+        },
+        {
+          label: "Email",
+          value: request.email,
+        },
+        {
+          label: "Approved By",
+          value: superAdmin.name || superAdmin.email,
+        },
+        {
+          label: "Date",
+          value: new Date().toLocaleDateString(),
+        },
+      ],
+    });
+
+    res.json({
+      success: true,
+      message: `${request.name}'s password has been reset to 11111111`,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
+/* =========================
+   rejectPasswordReset controller
+========================= */
+
+exports.rejectPasswordReset = async (req, res) => {
+  try {
+    const superAdmin = await Admin.findById(req.admin.id);
+
+    if (!superAdmin || superAdmin.role !== "Super Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access Denied",
+      });
+    }
+
+    const request = await PasswordResetRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Request Not Found",
+      });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Request already ${request.status}`,
+      });
+    }
+
+    request.status = "rejected";
+    await request.save();
+
+    await Notification.deleteMany({
+      category: "passwordreset",
+      requestId: request._id,
+    });
+
+    await Notification.create({
+      category: "passwordreset",
+      requestId: request._id,
+      variant: "red",
+      icon: "fa-xmark",
+      title: "Password Reset Rejected",
+      message: `${request.name}'s password reset request was rejected`,
+      details: [
+        {
+          label: "Name",
+          value: request.name,
+        },
+        {
+          label: "Email",
+          value: request.email,
+        },
+        {
+          label: "Rejected By",
+          value: superAdmin.name || superAdmin.email,
+        },
+        {
+          label: "Date",
+          value: new Date().toLocaleDateString(),
+        },
+      ],
+    });
+
+    res.json({
+      success: true,
+      message: "Request Rejected Successfully",
+    });
+  } catch (error) {
+    console.log(error);
+
     res.status(500).json({
       success: false,
       message: "Server Error",

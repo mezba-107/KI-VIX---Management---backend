@@ -883,20 +883,29 @@ router.put("/expenses/:id/done", adminAuth, async (req, res) => {
       });
     }
 
-    // সব partner বের করো
-    const partners = await Admin.find({
-      investment: { $gt: 0 },
-    });
+    // Popup থেকে কোন partner গুলো select করা হয়েছে (না থাকলে/ফাঁকা থাকলে = From All)
+    const { partnerIds } = req.body;
 
-    // যাদের Balance > 0
-    const activePartners = partners.filter((p) => {
-      return p.investment - p.expense > 0;
-    });
+    const hasSelection = Array.isArray(partnerIds) && partnerIds.length > 0;
+
+    // সব partner বের করো (Balance > 0 -> investment field ই বর্তমান balance, তাই আবার expense বাদ দেওয়া যাবে না)
+    const partnerQuery = {
+      isPartner: true,
+      investment: { $gt: 0 },
+    };
+
+    if (hasSelection) {
+      partnerQuery._id = { $in: partnerIds };
+    }
+
+    const activePartners = await Admin.find(partnerQuery);
 
     if (activePartners.length === 0) {
       return res.json({
         success: false,
-        message: "No active partner found.",
+        message: hasSelection
+          ? "Selected partner(s) have no balance to deduct from."
+          : "No active partner found.",
       });
     }
 
@@ -920,7 +929,7 @@ router.put("/expenses/:id/done", adminAuth, async (req, res) => {
 
     expense.done = true;
     expense.doneAt = new Date();
-    expense.doneBy = req.admin._id;
+    expense.doneBy = req.admin.id;
 
     await expense.save();
 
@@ -950,7 +959,9 @@ router.put("/expenses/:id/done", adminAuth, async (req, res) => {
         },
         {
           label: "Partners Charged",
-          value: `${activePartners.length}`,
+          value: hasSelection
+            ? activePartners.map((p) => p.name || p.email).join(", ")
+            : `All (${activePartners.length})`,
         },
         {
           label: "Completed By",

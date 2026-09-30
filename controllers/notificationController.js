@@ -21,9 +21,60 @@ const getNotifications = async (req, res) => {
     }).sort({
       createdAt: -1,
     });
+
+    // readBy তে নিজের id আছে কিনা দেখে প্রত্যেকটা notification এর জন্য
+    // এই admin এর জন্য আলাদা read/unread অবস্থা বসানো হলো
+    const withOwnReadStatus = notifications.map((n) => {
+      const obj = n.toObject();
+
+      obj.read = (n.readBy || []).some(
+        (readerId) => readerId.toString() === admin._id.toString(),
+      );
+
+      delete obj.readBy;
+
+      return obj;
+    });
+
     res.json({
       success: true,
-      notifications,
+      notifications: withOwnReadStatus,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+/* =========================
+   MARK NOTIFICATION AS READ
+   (শুধু এই admin এর জন্য read হবে, বাকিদের কাছে অপরিবর্তিত থাকবে)
+========================= */
+
+const markNotificationRead = async (req, res) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found",
+      });
+    }
+
+    const alreadyRead = (notification.readBy || []).some(
+      (readerId) => readerId.toString() === req.admin.id,
+    );
+
+    if (!alreadyRead) {
+      notification.readBy.push(req.admin.id);
+      await notification.save();
+    }
+
+    res.json({
+      success: true,
+      message: "Notification marked as read",
     });
   } catch (error) {
     res.status(500).json({
@@ -96,4 +147,5 @@ module.exports = {
   getNotifications,
   createNotification,
   deleteAllNotifications,
+  markNotificationRead,
 };
